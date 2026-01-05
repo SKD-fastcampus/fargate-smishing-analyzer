@@ -1,0 +1,20 @@
+resource "aws_security_group" "fargate_sg" {
+  name        = "smishing-analysis-sg"
+  description = "Allow only web traffic for analysis"
+  vpc_id      = var.vpc_id
+
+  # 나가는 트래픽: HTTP, HTTPS만 허용 (데이터 유출 및 스캔 방지)
+  egress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
