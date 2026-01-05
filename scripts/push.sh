@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="${SCRIPT_DIR}/../app"
 
 echo "Building Docker Image from ${APP_DIR}..."
-docker build --platform linux/amd64 -t ${REPO_NAME} "${APP_DIR}"
+docker build --platform linux/amd64 --provenance=false -t ${REPO_NAME} "${APP_DIR}"
 
 echo "Tagging Image..."
 docker tag ${REPO_NAME}:${TAG} ${FULL_IMAGE_NAME}

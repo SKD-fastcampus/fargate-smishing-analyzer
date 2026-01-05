@@ -15,7 +15,7 @@ if [ -z "$TASK_ARNS" ]; then
     echo "Checking recently stopped tasks..."
     STOPPED_TASK_ARNS=$(aws ecs list-tasks --cluster $CLUSTER_NAME --max-items 5 --desired-status STOPPED --profile $PROFILE --query "taskArns[]" --output text)
     
-    if [ -n "$STOPPED_TASK_ARNS" ]; then
+    if [ -n "$STOPPED_TASK_ARNS" ] && [ "$STOPPED_TASK_ARNS" != "None" ]; then
         aws ecs describe-tasks --cluster $CLUSTER_NAME --tasks $STOPPED_TASK_ARNS --profile $PROFILE \
             --query "tasks[].{Arn:taskArn, Status:lastStatus, StoppedReason:stoppedReason, CreatedAt:createdAt}" \
             --output table

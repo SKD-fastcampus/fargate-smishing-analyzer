@@ -3,6 +3,12 @@ provider "aws" {
   profile = "Admin@aground5"
 }
 
+# 1. CloudWatch Log Group (필수: 없으면 Task 실행 실패)
+resource "aws_cloudwatch_log_group" "smishing_logs" {
+  name              = "/ecs/smishing-analysis"
+  retention_in_days = 7
+}
+
 # 1. ECS 클러스터 생성
 resource "aws_ecs_cluster" "smishing_analysis" {
   name = "smishing-analysis-cluster"
@@ -30,6 +36,7 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
 # 3-1. S3 Bucket (결과 저장소)
 resource "aws_s3_bucket" "smishing_results" {
   bucket_prefix = "smishing-analysis-results-"
+  force_destroy = true # 내용물이 있어도 삭제 허용
 }
 
 # 3-2. IAM Policy for S3 Access (Task Role)
@@ -61,6 +68,7 @@ resource "aws_iam_role_policy" "ecs_task_s3_policy" {
 resource "aws_ecr_repository" "smishing_repo" {
   name                 = "smishing-bot"
   image_tag_mutability = "MUTABLE"
+  force_delete         = true # 이미지가 있어도 삭제 허용
 
   image_scanning_configuration {
     scan_on_push = true
@@ -141,24 +149,5 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
     base              = 1
     weight            = 100
     capacity_provider = "FARGATE_SPOT"
-  }
-}
-
-# 7. ECS Service (Fargate Spot으로 실행)
-resource "aws_ecs_service" "main" {
-  name            = "smishing-service"
-  cluster         = aws_ecs_cluster.smishing_analysis.id
-  task_definition = aws_ecs_task_definition.smishing_task.arn
-  desired_count   = 1
-
-  capacity_provider_strategy {
-    capacity_provider = "FARGATE_SPOT"
-    weight            = 100
-  }
-
-  network_configuration {
-    subnets          = var.subnet_ids
-    security_groups  = [aws_security_group.fargate_sg.id]
-    assign_public_ip = true
   }
 }

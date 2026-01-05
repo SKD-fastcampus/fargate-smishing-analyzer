@@ -13,7 +13,7 @@ aws ecs run-task \
   --cluster smishing-analysis-cluster \
   --task-definition smishing-analyzer \
   --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[subnet-0df98d0747157a6af,subnet-036c02d15ba75a859,subnet-06469bc1ec66a5b4c,subnet-047da211827c7d8ce],securityGroups=[sg-042b6749b75be2754],assignPublicIp=ENABLED}" \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-0df98d0747157a6af,subnet-036c02d15ba75a859,subnet-06469bc1ec66a5b4c,subnet-047da211827c7d8ce],securityGroups=[sg-0b3c36f06a2e7799e],assignPublicIp=ENABLED}" \
   --overrides "containerOverrides=[{name='analyzer',environment=[{name='TARGET_URL',value='$TARGET_URL'}]}]" \
   --profile Admin@aground5
 
