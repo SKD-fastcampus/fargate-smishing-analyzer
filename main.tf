@@ -1,3 +1,8 @@
+provider "aws" {
+  region  = "ap-northeast-2"
+  profile = "Admin@aground5"
+}
+
 # 1. ECS 클러스터 생성
 resource "aws_ecs_cluster" "smishing_analysis" {
   name = "smishing-analysis-cluster"

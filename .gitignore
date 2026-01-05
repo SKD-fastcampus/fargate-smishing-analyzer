@@ -1,0 +1,17 @@
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# Node.js
+node_modules/
+npm-debug.log
+
+# Docker
+# (Exclude if you don't want local builds in git, usually we keep Dockerfile but invoke build)
