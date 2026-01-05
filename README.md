@@ -17,6 +17,29 @@ Playwright와 Stealth 플러그인을 사용하여 탐지를 우회하며, 대�
 *   **AWS S3**: 분석 결과 저장소 (`smishing-analysis-results-...`)
 *   **AWS CloudWatch**: 분석 로그 저장소 (`/ecs/smishing-analysis`)
 
+## ⚙️ AWS 동작 원리 (How it Works)
+
+사용자가 `make run` 명령어를 입력했을 때 AWS 내부에서 일어나는 과정입니다.
+
+1.  **실행 요청 (Trigger)**:
+    *   로컬 PC에서 AWS CLI를 통해 ECS에게 *"이 작업(Task Definition)을 실행해줘"* 라고 요청합니다.
+    *   이때 분석할 `TARGET_URL`과 결과 저장소인 `S3_BUCKET_NAME`을 환경 변수로 주입합니다.
+
+2.  **리소스 할당 (Provisioning)**:
+    *   AWS Fargate가 요청을 받고, 남는 유휴 자원(Spot Instance)을 찾아 컨테이너를 실행할 공간을 확보합니다. (`PROVISIONING` 상태)
+
+3.  **이미지 다운로드 (Pull Image)**:
+    *   ECR에 저장된 `smishing-bot` 이미지를 가져와서 컨테이너를 실행합니다. (`PENDING` -> `RUNNING` 상태)
+
+4.  **분석 수행 (Analysis)**:
+    *   `app/index.js`가 실행되면서 Headless Chrome이 켜집니다.
+    *   Stealth Plugin으로 봇 탐지를 우회하며 타겟 사이트에 접속합니다.
+    *   스크린샷, 소스 코드, 네트워크 패킷 등을 수집하고 위험 요소를 분석합니다.
+
+5.  **결과 저장 (Upload)**:
+    *   수집된 모든 데이터를 S3 버킷(`smishing-analysis-results-...`)으로 업로드합니다.
+    *   작업이 완료되면 컨테이너는 스스로 종료되고, 사용된 자원은 반납됩니다. (`STOPPED` 상태)
+
 ## 📂 프로젝트 구조 (Structure)
 
 ```text
