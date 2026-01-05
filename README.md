@@ -3,42 +3,61 @@
 서버리스(AWS Fargate Spot) 환경에서 동작하는 스미싱 사이트 분석 봇입니다.
 Playwright와 Stealth 플러그인을 사용하여 탐지를 우회하며, 대상 사이트의 스크린샷, 소스 코드, 네트워크 패킷(HAR), 쿠키/스토리지 정보를 수집하여 S3에 저장합니다.
 
-## 🏗 아키텍처 (Architecture)
+## 🏗 AWS 인프라 상세 구조 (Infrastructure Deep Dive)
 
-**핵심 특징:**
-*   **100% Serverless**: 관리할 EC2 인스턴스가 없습니다.
-*   **One-off Execution**: 항상 실행되지 않고, `make run` 명령을 내릴 때만 Fargate Task가 생성되어 실행되고 종료됩니다. (비용 절감)
-*   **Spot Instances**: Fargate Spot을 100% 사용하여 비용을 최소화했습니다.
-*   **Circuit Breaker**: 배포 실패 시 자동으로 롤백되어 무한 재시도를 방지합니다.
+이 프로젝트는 Terraform(`main.tf`)을 통해 다음과 같은 AWS 리소스들을 유기적으로 연결하여 구성됩니다.
 
-**구성 요소:**
-*   **AWS ECS**: Fargate Cluster (Cluster만 존재, Service 없음)
-*   **AWS ECR**: Docker 이미지 저장소 (`smishing-bot`)
-*   **AWS S3**: 분석 결과 저장소 (`smishing-analysis-results-...`)
-*   **AWS CloudWatch**: 분석 로그 저장소 (`/ecs/smishing-analysis`)
+### 1. 보안 & 네트워크 (Security & Network)
+*   **Security Group (`aws_security_group`)**:
+    *   인바운드(Inbound): **차단** (외부 접속 불가, 보안 강화)
+    *   아웃바운드(Outbound): **443(HTTPS), 80(HTTP) 허용** (분석 대상 사이트 접속 및 S3/ECR/CloudWatch 통신용)
+    *   역할: 봇이 감염된 사이트에 접속하여 정보를 가져올 수 있게 열어주되, 외부에서 봇을 해킹하지 못하도록 막습니다.
 
-## ⚙️ AWS 동작 원리 (How it Works)
+### 2. 컴퓨팅환경 (Compute - ECS Fargate)
+*   **ECS Cluster (`aws_ecs_cluster`)**:
+    *   컨테이너가 실행될 논리적 그룹입니다.
+*   **Capacity Provider**:
+    *   **`FARGATE_SPOT` (100%)**: AWS의 남는 컴퓨팅 자원을 사용하여 비용을 70% 이상 절감합니다.
 
-사용자가 `make run` 명령어를 입력했을 때 AWS 내부에서 일어나는 과정입니다.
+### 3. 작업 정의 (Task Definition)
+*   **Task Definition (`aws_ecs_task_definition`)**:
+    *   **Container**: `application` 컨테이너 하나만 실행됩니다.
+    *   **Image**: ECR(`aws_ecr_repository`)에 저장된 `smishing-bot:latest` 이미지를 사용합니다.
+    *   **Resources**: 0.5 vCPU / 1GB Memory (가벼운 브라우저 구동에 최적화)
+    *   **Environment Variables**: `TARGET_URL`(분석 주소)과 `S3_BUCKET_NAME`을 실행 시점에 주입받습니다.
 
-1.  **실행 요청 (Trigger)**:
-    *   로컬 PC에서 AWS CLI를 통해 ECS에게 *"이 작업(Task Definition)을 실행해줘"* 라고 요청합니다.
-    *   이때 분석할 `TARGET_URL`과 결과 저장소인 `S3_BUCKET_NAME`을 환경 변수로 주입합니다.
+### 4. 배포 및 저장소 (Deployment & Storage)
+*   **ECR (`aws_ecr_repository`)**:
+    *   `smishing-bot` 도커 이미지가 저장되는 곳입니다.
+    *   `push.sh` 스크립트가 로컬에서 빌드된 이미지를 이곳으로 `push` 합니다.
+*   **S3 Bucket (`aws_s3_bucket`)**:
+    *   분석 결과물(스크린샷, 리포트, 소스 등)이 영구 저장됩니다.
+    *   Task는 IAM Role을 통해 이곳에 `PutObject` 할 수 있는 권한을 가집니다.
+*   **IAM Roles (`aws_iam_role`)**:
+    *   **Execution Role**: ECS가 이미지를 Pull 하고 로그를 CloudWatch에 남길 권한.
+    *   **Task Role**: 컨테이너 내부의 코드가 S3에 파일을 업로드할 권한.
 
-2.  **리소스 할당 (Provisioning)**:
-    *   AWS Fargate가 요청을 받고, 남는 유휴 자원(Spot Instance)을 찾아 컨테이너를 실행할 공간을 확보합니다. (`PROVISIONING` 상태)
+---
 
-3.  **이미지 다운로드 (Pull Image)**:
-    *   ECR에 저장된 `smishing-bot` 이미지를 가져와서 컨테이너를 실행합니다. (`PENDING` -> `RUNNING` 상태)
+## ⚙️ 전체 동작 흐름 (End-to-End Workflow)
 
-4.  **분석 수행 (Analysis)**:
-    *   `app/index.js`가 실행되면서 Headless Chrome이 켜집니다.
-    *   Stealth Plugin으로 봇 탐지를 우회하며 타겟 사이트에 접속합니다.
-    *   스크린샷, 소스 코드, 네트워크 패킷 등을 수집하고 위험 요소를 분석합니다.
+1.  **Build & Push (`make build`)**:
+    *   `scripts/push.sh`가 실행되어 Docker 이미지를 빌드합니다.
+    *   AWS ECR(`aws_ecr_repository`)로 이미지를 업로드합니다.
 
-5.  **결과 저장 (Upload)**:
-    *   수집된 모든 데이터를 S3 버킷(`smishing-analysis-results-...`)으로 업로드합니다.
-    *   작업이 완료되면 컨테이너는 스스로 종료되고, 사용된 자원은 반납됩니다. (`STOPPED` 상태)
+2.  **Provisioning (`make run`)**:
+    *   `run_task.sh`가 `aws ecs run-task` 명령을 보냅니다.
+    *   ECS는 `FARGATE_SPOT` 풀에서 자원을 확보하고, 지정된 **Security Group**과 **Subnet** 안에 네트워크 인터페이스(ENI)를 생성합니다.
+
+3.  **Execution (Task Start)**:
+    *   ECR에서 이미지를 가져와 컨테이너를 띄웁니다.
+    *   이때 `TARGET_URL` 환경변수가 컨테이너로 전달됩니다.
+
+4.  **Analysis & Upload**:
+    *   Node.js 앱이 타겟 사이트를 분석하고, **IAM Task Role** 권한을 이용해 S3 버킷에 결과 파일을 직접 업로드합니다.
+
+5.  **Termination**:
+    *   분석이 끝나면 프로세스가 종료되고(Exit 0), Fargate Task는 즉시 삭제(Stop)되어 과금이 중단됩니다.
 
 ## 📂 프로젝트 구조 (Structure)
 
