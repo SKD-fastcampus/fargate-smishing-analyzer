@@ -1,19 +1,20 @@
-FROM mcr.microsoft.com/playwright:v1.57.0-noble
+# 공식 Playwright Python 이미지 (Chromium 포함)
+FROM mcr.microsoft.com/playwright/python:v1.41.0-jammy
 
-# Set working directory
+# 작업 디렉토리
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if available)
-COPY package.json ./
+# Python 패키지 복사
+COPY requirements.txt .
 
-# Install dependencies
-# We use npm ci if package-lock.json exists, otherwise npm install
-# Base image already includes browsers, so we skip downloading them again
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-RUN npm install
+# Python 라이브러리 설치
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY index.js .
+# Playwright 브라우저 설치 (이미지에 포함돼 있지만 안전하게)
+RUN playwright install chromium
 
-# Default command
-CMD ["node", "index.js"]
+# 앱 코드 복사
+COPY app ./app
+
+# 컨테이너 실행 시 명령
+CMD ["python", "app/main.py"]
