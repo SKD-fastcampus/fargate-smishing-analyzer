@@ -9,6 +9,8 @@ async def main():
     
     if results["status"] == "ok":
         upload_results(results, config)
+        del results["screenshot"]
+        print(results)
     
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

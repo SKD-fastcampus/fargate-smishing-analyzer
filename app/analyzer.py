@@ -1,5 +1,5 @@
 from browser import launch_browser
-from app.page_elements import collect_elements, attach_network_trackers
+from page_elements import collect_elements, attach_network_trackers
 from playwright.sync_api import TimeoutError, Error
 from playwright_stealth import Stealth
 from urllib.parse import urlparse
@@ -137,28 +137,30 @@ def risk_leveling(risk_score):
     else:
         return "LOW"
 
-await def analyze(config):
-    playwright, browser, context = launch_browser()
+async def analyze(config):
+    playwright, browser, context = await launch_browser()
     
-    page = context.new_page()
-    Stealth(page)
+    stealth = Stealth()
+    await stealth.apply_stealth_async(context)
+    
+    page = await context.new_page()
     
     try:
         network_data = attach_network_trackers(page)
         
         # 페이지 JS 동작 안정화 대기
-        page.wait_for_timeout(2000)
+        await page.wait_for_timeout(2000)
         
-        page.goto(config["target_url"], timeout=30000, wait_until="domcontentloaded")
-        elements = collect_elements(page, context, network_data)
+        await page.goto(config["target_url"], timeout=30000, wait_until="domcontentloaded")
+        elements = await collect_elements(page, context, network_data)
         
     except TimeoutError:
         elements = {"status": "timeout"}
     except Error as e:
         elements = {"status": "error", "message": str(e)}
     finally:
-        browser.close()
-        playwright.stop()
+        await browser.close()
+        await playwright.stop()
     
     results = {
         "status": "err"

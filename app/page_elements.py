@@ -28,11 +28,11 @@ def attach_network_trackers(page):
                 "post_data": request.post_data
             })
     
-    def on_response(response):
+    async def on_response(response):
         try:
             ct = response.headers.get("content-type", "")
             if "javascript" in ct:
-                body = response.text()
+                body = await response.text()
                 hits = body.count("eval(")
                 if hits > 0:
                     js_eval_hits.append({
@@ -68,11 +68,11 @@ def attach_network_trackers(page):
         "js_eval_hits": js_eval_hits
     }
 
-def collect_elements(page, context, network_data):
+async def collect_elements(page, context, network_data):
     # --------------------
     # UI deception / DOM
     # --------------------
-    ui_deception = page.evaluate("""
+    ui_deception = await page.evaluate("""
     () => ({
         fullscreen: !!document.fullscreenElement,
         hidden_overflow: getComputedStyle(document.body).overflow === 'hidden'
@@ -82,7 +82,7 @@ def collect_elements(page, context, network_data):
     # --------------------
     # Keystroke capture
     # --------------------
-    keystroke_capture = page.evaluate("""
+    keystroke_capture = await page.evaluate("""
     () => ({
         onkeydown: document.querySelectorAll('[onkeydown]').length,
         onkeypress: document.querySelectorAll('[onkeypress]').length,
@@ -100,7 +100,7 @@ def collect_elements(page, context, network_data):
     # --------------------
     # Tab / navigation control
     # --------------------
-    tab_control = page.evaluate("""
+    tab_control = await page.evaluate("""
     () => ({
         // 탭 닫기 / 뒤로가기 방해
         before_unload: !!window.onbeforeunload,
@@ -122,7 +122,7 @@ def collect_elements(page, context, network_data):
     # --------------------
     # Domain mismatch
     # --------------------
-    domain_mismatch = page.evaluate("""
+    domain_mismatch = await page.evaluate("""
     () => {
         const pageHost = location.hostname;
         const root = h => h?.split('.').slice(-2).join('.');
@@ -229,7 +229,7 @@ def collect_elements(page, context, network_data):
     except Exception:
         domain_age = -1
     
-    captcha_detected = page.evaluate("""
+    captcha_detected = await page.evaluate("""
     () => {
         return {
             recaptcha: !!document.querySelector('[src*="recaptcha"]'),
@@ -245,9 +245,9 @@ def collect_elements(page, context, network_data):
         "page_url": page.url,
 
         # raw
-        "html": page.content(),
-        "screenshot": page.screenshot(full_page=True),
-        "cookies": context.cookies(),
+        "html": await page.content(),
+        "screenshot": await page.screenshot(full_page=True),
+        "cookies": await context.cookies(),
 
         # network
         "redirect_chain": network_data["redirects"],
