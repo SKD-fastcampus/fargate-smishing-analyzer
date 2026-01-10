@@ -1,10 +1,11 @@
+import asyncio
 from analyzer import analyze
 from config import load_config
 from storage import upload_results
 
-def main():
+async def main():
     config = load_config()
-    results = analyze(config)
+    results = await analyze(config)
     
     if results["status"] == "ok":
         upload_results(results, config)

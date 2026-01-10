@@ -1,12 +1,36 @@
 from browser import launch_browser
 from app.page_elements import collect_elements, attach_network_trackers
 from playwright.sync_api import TimeoutError, Error
-from playwright_stealth import stealth
+from playwright_stealth import Stealth
 from urllib.parse import urlparse
 
 def build_redirect_chain(elements):
     chain = []
     
+    for r in elements["redirect_chain"]:
+        chain.append({
+            "type": "HTTP",   # JS redirect 추적하면 분리 가능
+            "from": r["from"],
+            "to": r["to"],
+            "status": 302
+        })
+    
+    # JS redirect (navigation_log 기반)
+    nav_log = elements.get("navigation_log", [])
+    for i in range(1, len(nav_log)):
+        prev = nav_log[i - 1]["url"]
+        curr = nav_log[i]["url"]
+        if prev != curr:
+            # 오탐 필터: 같은 eTLD면 제외
+            def root(h):
+                return ".".join(h.split(".")[-2:]) if h else None
+
+            if root(prev) != root(curr):
+                chain.append({
+                    "type": "JS",
+                    "from": prev,
+                    "to": curr
+                })
     
     return chain
 
@@ -24,30 +48,50 @@ def build_download_attempt(elements):
     }
 
 def technical_findings(elements):
-    pass
+    return {
+        "ui_deception": (
+            elements["ui_deception"]["fullscreen"] or
+            elements["ui_deception"]["hidden_overflow"]
+        ),
+        "domain_mismatch": any(
+            f["mismatch"] or f["scheme_suspicious"]
+            for f in elements["domain_mismatch"]
+        )
+    }
 
 def behavioral_findings(elements):
+    def is_external_post(post_url, page_url):
+        page_root = ".".join(urlparse(page_url).hostname.split(".")[-2:])
+        post_root = ".".join(urlparse(post_url).hostname.split(".")[-2:])
+        return page_root != post_root
+
+    external_posts = [
+        p for p in elements["post_requests"]
+        if is_external_post(p["url"], elements["page_url"])
+    ]
+    
     return {
         "keystroke_capture": (
             elements["keystroke_capture"]["onkeydown"] > 0 or
+            elements["keystroke_capture"]["onkeypress"] > 0 or
             elements["keystroke_capture"]["onkeyup"] > 0
         ),
-        "external_post_on_input": any(
-            p for p in elements["post_requests"]
-        ),
+        "external_post_on_input": bool(external_posts),
         "eval_usage_count": elements["eval_usage_count"],
         "tab_control_script": (
             elements["tab_control"]["before_unload"] or
-            elements["tab_control"]["visibility_handler"]
+            elements["tab_control"]["onunload"] or
+            elements["tab_control"]["visibility_handler"] or
+            elements["tab_control"]["onblur"] or
+            elements["tab_control"]["onfocus"] or
+            elements["tab_control"]["onresize"] or
+            elements["tab_control"]["history_length"] > 1
         )
     }
 
 
 def domain_analysis(elements):
     return {
-        "domain_mismatch": any(
-            f["mismatch"] for f in elements["domain_mismatch"]
-        ),
         "domain_age_days": elements["domain_age"]
     }
 
@@ -93,11 +137,11 @@ def risk_leveling(risk_score):
     else:
         return "LOW"
 
-def analyze(config):
+await def analyze(config):
     playwright, browser, context = launch_browser()
     
     page = context.new_page()
-    stealth(page)
+    Stealth(page)
     
     try:
         network_data = attach_network_trackers(page)
@@ -107,9 +151,6 @@ def analyze(config):
         
         page.goto(config["target_url"], timeout=30000, wait_until="domcontentloaded")
         elements = collect_elements(page, context, network_data)
-        
-        # 여기서 수집해 온 페이지 요소 분석
-        # 리다이렉트 체인, JS 리다이렉트 추적, html DOM input field 분석
         
     except TimeoutError:
         elements = {"status": "timeout"}

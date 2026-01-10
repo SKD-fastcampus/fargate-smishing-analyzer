@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 def attach_network_trackers(page):
     redirects = []
+    navigation_log = []
     downloads = []
     post_requests = []
     js_eval_hits = []
@@ -46,13 +47,22 @@ def attach_network_trackers(page):
             "url": download.url,
             "filename": download.suggested_filename
         })
+        
+    def on_frame_navigated(frame):
+        if frame.parent_frame is None:  # main frame only
+            navigation_log.append({
+                "url": frame.url,
+                "timestamp": time.time()
+            })
 
     page.on("request", on_request)
     page.on("response", on_response)
     page.on("download", on_download)
+    page.on("framenavigated", on_frame_navigated)
     
     return {
         "redirects": redirects,
+        "navigation_log": navigation_log,
         "downloads": downloads,
         "post_requests": post_requests,
         "js_eval_hits": js_eval_hits
@@ -232,6 +242,7 @@ def collect_elements(page, context, network_data):
 
     return {
         "status": "ok",
+        "page_url": page.url,
 
         # raw
         "html": page.content(),
@@ -240,6 +251,7 @@ def collect_elements(page, context, network_data):
 
         # network
         "redirect_chain": network_data["redirects"],
+        "navigation_log": network_data["navigation_log"],
         "downloads": network_data["downloads"],
         "post_requests": network_data["post_requests"],
 

@@ -1,8 +1,9 @@
-from playwright.sync_api import sync_playwright
+import asyncio
+from playwright.async_api import async_playwright
 
-def launch_browser():
-    playwright = sync_playwright().start()
-    browser = playwright.chromium.launch(
+async def launch_browser():
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch(
         headless=True,
         args=[
             "--no-sandbox",
@@ -10,7 +11,7 @@ def launch_browser():
             "--disable-dev-shm-usage"
         ]
     )
-    context = browser.new_context(
+    context = await browser.new_context(
         ignore_https_errors=True,
         user_agent=(
             "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) "
