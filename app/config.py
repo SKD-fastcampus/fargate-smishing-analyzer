@@ -6,6 +6,8 @@ def load_config():
     S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
     AWS_REGION = os.getenv("AWS_REGION", "ap-northeast-2")
     
+    USER_ID = os.getenv("USER_ID")
+    
     if not TARGET_URL:
         print("Error: TARGET_URL environment variable is not set.")
         exit(1)
@@ -17,5 +19,6 @@ def load_config():
     return {
         "target_url": TARGET_URL,
         "s3_bucket_name": S3_BUCKET_NAME,
-        "aws_region": AWS_REGION
+        "aws_region": AWS_REGION,
+        "user_id": USER_ID
     }
