@@ -17,4 +17,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app
 
 # 컨테이너 실행 시 명령
-CMD ["python", "app/main.py"]
+CMD ["python", "/app/main.py"]
