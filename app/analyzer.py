@@ -1,13 +1,13 @@
 from browser import launch_browser
 from page_elements_to_s3 import collect_elements
 from playwright.sync_api import TimeoutError, Error
-from playwright_stealth import stealth_sync
+from playwright_stealth import stealth
 
 def analyze(config):
     playwright, browser, context = launch_browser()
     
     page = context.new_page()
-    stealth_sync(page)
+    stealth(page)
     
     try:
         page.goto(config["target_url"], timeout=30000, wait_until="domcontentloaded")
