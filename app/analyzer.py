@@ -107,35 +107,233 @@ def certificate_analysis(elements):
         "issued_days_ago": tls.get("cert_age_days"),
         "suspicious": suspicious
     }
+    
+def count_js_navigation(navigation_log, http_redirects, time_threshold=1.5):
+    """
+    JS redirect 판단 기준:
+    - HTTP redirect가 아님
+    - 이전 navigation 이후 매우 짧은 시간 내 발생
+    - eTLD+1 이 다름
+    """
+    def root(url):
+        try:
+            h = urlparse(url).hostname
+            if not h:
+                return None
+            return ".".join(h.split(".")[-2:])
+        except Exception:
+            return None
+
+    # HTTP redirect로 이미 처리된 이동 쌍
+    http_pairs = {
+        (r["from"], r["to"]) for r in http_redirects
+    }
+
+    count = 0
+    for i in range(1, len(navigation_log)):
+        prev = navigation_log[i - 1]
+        curr = navigation_log[i]
+
+        # 시간 간격 체크 (자동 이동 여부)
+        if curr["timestamp"] - prev["timestamp"] > time_threshold:
+            continue
+
+        prev_url = prev["url"]
+        curr_url = curr["url"]
+
+        # HTTP redirect면 제외
+        if (prev_url, curr_url) in http_pairs:
+            continue
+
+        r1 = root(prev_url)
+        r2 = root(curr_url)
+
+        if r1 and r2 and r1 != r2:
+            count += 1
+
+    return count
 
 def risk_scoring(elements):
     score = 0
+    MAX_SCORE = 284
+    
+    # --------------------
+    # HTTP Redirects
+    # --------------------
+    http_redirects = len(elements["redirect_chain"])
 
-    if elements["domain_age"] == -1 or elements["domain_age"] < 5:
-        score += 20
-
-    if elements["eval_usage_count"] > 5:
-        score += 15
-
-    if any(elements["downloads"]):
-        score += 30
-
-    if any(f["mismatch"] for f in elements["domain_mismatch"]):
+    if http_redirects >= 6:
         score += 25
+    elif http_redirects >= 4:
+        score += 18
+    elif http_redirects >= 2:
+        score += 10
+    elif http_redirects == 1:
+        score += 4
+    
+    # --------------------
+    # JS Navigation Redirects
+    # --------------------
+    js_nav_count = count_js_navigation(
+        elements.get("navigation_log", []),
+        elements.get("redirect_chain", [])
+    )
 
-    if elements["ui_deception"]["fullscreen"]:
+
+    if js_nav_count >= 3:
+        score += 25
+    elif js_nav_count == 2:
+        score += 15
+    elif js_nav_count == 1:
+        score += 8
+    
+    # --------------------
+    # Download attempt
+    # --------------------
+    if elements["downloads"]:
+        score += 30
+        
+    # --------------------
+    # External POST
+    # --------------------
+    page_root = ".".join(urlparse(elements["page_url"]).hostname.split(".")[-2:])
+    external_posts = []
+
+    for p in elements["post_requests"]:
+        try:
+            post_root = ".".join(urlparse(p["url"]).hostname.split(".")[-2:])
+            if post_root != page_root:
+                external_posts.append(p)
+        except Exception:
+            continue
+
+    if len(external_posts) >= 2:
+        score += 25
+    elif len(external_posts) == 1:
+        score += 15
+    
+    # --------------------
+    # UI Deception
+    # --------------------
+    ui = elements["ui_deception"]
+    if ui["fullscreen"]:
+        score += 10
+    if ui["hidden_overflow"]:
+        score += 8
+        
+    # --------------------
+    # Keystroke Capture
+    # --------------------
+    kc = elements["keystroke_capture"]
+    key_events = kc["onkeydown"] + kc["onkeypress"] + kc["onkeyup"]
+
+    if key_events >= 3:
+        score += 25
+    elif key_events >= 1:
+        score += 10
+        
+    # --------------------
+    # eval usage
+    # --------------------
+    eval_cnt = elements["eval_usage_count"]
+    if eval_cnt > 10:
+        score += 25
+    elif eval_cnt > 5:
+        score += 18
+    elif eval_cnt > 2:
+        score += 10
+    elif eval_cnt > 0:
+        score += 5
+
+    # --------------------
+    # Tab / Navigation control
+    # --------------------
+    tc = elements["tab_control"]
+    
+    score += 8 if tc["before_unload"] else 0
+    score += 8 if tc["onunload"] else 0
+    score += 4 if tc["visibility_handler"] else 0
+    score += 3 if tc["onblur"] else 0
+    score += 3 if tc["onfocus"] else 0
+
+    if tc["history_length"] > 3:
         score += 10
 
-    return min(score, 100)
+    # --------------------
+    # Domain age
+    # --------------------
+    age = elements["domain_age"]
+    if age in (-1, None):
+        score += 30
+    elif age < 7:
+        score += 30
+    elif age < 30:
+        score += 20
+    elif age < 90:
+        score += 10
+    elif age < 365:
+        score += 5
+
+    # --------------------
+    # TLS / Certificate
+    # --------------------
+    tls = elements["tls_info"]
+    if "error" in tls:
+        score += 25
+    else:
+        if tls.get("cert_age_days", 9999) < 7:
+            score += 20
+        elif tls.get("cert_age_days", 9999) < 30:
+            score += 10
+            
+    # --------------------
+    # Domain mismatch
+    # --------------------
+    mismatches = elements["domain_mismatch"]
+
+    external = [
+        f for f in mismatches
+        if f["mismatch"]
+    ]
+
+    suspicious_scheme = [
+        f for f in mismatches
+        if f["scheme_suspicious"]
+    ]
+
+    external_forms = len(external)
+    scheme_forms = len(suspicious_scheme)
+    
+    if external_forms >= 2:
+        score += 30
+    elif external_forms == 1:
+        score += 20
+
+    if scheme_forms > 0:
+        score += 15
+    
+    # --------------------
+    # 백분율 반영 & limitation 반영
+    # --------------------
+    score = score/MAX_SCORE * 100
+            
+    if any(elements["limitation"].values()):
+        score *= 0.8
+
+    return score
 
 
 def risk_leveling(risk_score):
-    if risk_score >= 70:
-        return "HIGH"
-    elif risk_score >= 40:
-        return "MEDIUM"
+    risk_level = "LOW"
+    
+    if risk_score >= 55:
+        risk_level = "HIGH"
+    elif risk_score >= 25:
+        risk_level = "MEDIUM"
     else:
-        return "LOW"
+        risk_level = "LOW"
+        
+    return risk_level
 
 async def analyze(config):
     playwright, browser, context = await launch_browser()
