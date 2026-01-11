@@ -65,8 +65,8 @@ def upload_results(results, config):
             """
 
             screenshot_path = None
-            if "screenshots" in results:
-                s = results["screenshots"]
+            if "screenshot" in results:
+                s = results["screenshot"]
                 screenshot_path = f"s3://{s['bucket']}/{s['key']}"
 
             cursor.execute(
@@ -74,7 +74,7 @@ def upload_results(results, config):
                 (
                     results.get("target_url"),              # original_url
                     results.get("final_url"),               # final_url
-                    results.get("status", "DONE"),          # status
+                    "DONE",                                 # status
                     results.get("risk_score"),              # risk_score
                     screenshot_path,                        # screenshot_path
                     json.dumps(results, ensure_ascii=False),# details (전체 분석 결과)
