@@ -369,7 +369,7 @@ async def analyze(config):
         results["status"] = "ok"
         results["user_id"] = config["user_id"]
         results["target_url"] = config["target_url"]
-        results["final_url"] = config["page_url"]
+        results["final_url"] = elements["page_url"]
         results["screenshot"] = elements["screenshot"]
         results["summary"] = {
             "risk_score": risk_score,
