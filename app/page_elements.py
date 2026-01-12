@@ -30,6 +30,7 @@ def attach_network_trackers(page):
     
     async def on_response(response):
         try:
+            print("js 파일 불러오기(eval count)")
             ct = response.headers.get("content-type", "")
             if "javascript" in ct:
                 body = await response.text()
@@ -39,8 +40,8 @@ def attach_network_trackers(page):
                         "url": response.url,
                         "count": hits
                     })
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"js 파일 불러오기 실패: {e}")
 
     def on_download(download):
         downloads.append({
@@ -166,6 +167,7 @@ async def collect_elements(page, context, network_data):
     
     tls_info = {}
     try:
+        print("tls 연결 시작")
         ctx = ssl.create_default_context()
         with socket.create_connection((host, 443), timeout=5) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
@@ -201,6 +203,7 @@ async def collect_elements(page, context, network_data):
                     "days_until_expiry": (not_after - now).days
                 }
     except Exception as e:
+        print(f"tls 연결 실패: {e}")
         tls_info = {
             "https": True,
             "error": str(e)
@@ -211,6 +214,7 @@ async def collect_elements(page, context, network_data):
     # --------------------
     domain_age = None
     try:
+        print("domain 정보 불러오기...")
         w = whois.whois(domain)
 
         created = w.creation_date
@@ -227,6 +231,7 @@ async def collect_elements(page, context, network_data):
         domain_age = (now - created).days
 
     except Exception:
+        print("domain 정보 불러오기 실패")
         domain_age = -1
     
     captcha_detected = await page.evaluate("""

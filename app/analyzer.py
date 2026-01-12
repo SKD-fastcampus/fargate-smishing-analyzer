@@ -117,11 +117,13 @@ def count_js_navigation(navigation_log, http_redirects, time_threshold=1.5):
     """
     def root(url):
         try:
+            print("url에서 root domain 추출 중...")
             h = urlparse(url).hostname
             if not h:
                 return None
             return ".".join(h.split(".")[-2:])
         except Exception:
+            print("root domain 추출 실패")
             return None
 
     # HTTP redirect로 이미 처리된 이동 쌍
@@ -201,11 +203,12 @@ def risk_scoring(elements):
 
     for p in elements["post_requests"]:
         try:
+            print("외부로 post하는지 url 비교로 확인 중..")
             post_root = ".".join(urlparse(p["url"]).hostname.split(".")[-2:])
             if post_root != page_root:
                 external_posts.append(p)
         except Exception:
-            continue
+            print("외부 post 요청 확인 실패")
 
     if len(external_posts) >= 2:
         score += 25
@@ -344,6 +347,8 @@ async def analyze(config):
     page = await context.new_page()
     
     try:
+        print("새 page 생성")
+        
         network_data = attach_network_trackers(page)
         
         # 페이지 JS 동작 안정화 대기
@@ -353,10 +358,13 @@ async def analyze(config):
         elements = await collect_elements(page, context, network_data)
         
     except TimeoutError:
+        print("timeout")
         elements = {"status": "timeout"}
     except Error as e:
+        print(f"error 발생: {e}")
         elements = {"status": "error", "message": str(e)}
     finally:
+        print("browser 닫는 중...")
         await browser.close()
         await playwright.stop()
     

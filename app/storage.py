@@ -10,6 +10,7 @@ def upload_results(results, config):
     results.pop("status", None)
     
     try:
+        print("S3 업로드 시작...")
         # s3 클라이언트 생성
         s3 = boto3.client("s3", region_name=config["aws_region"])
         
@@ -33,7 +34,7 @@ def upload_results(results, config):
         }
         
     except Exception as e:
-        print(f"Failed to upload screenshot: {e}")
+        print(f"S3에 screenshot 업로드 실패: {e}")
     
     # DB 업로드 수행
     load_dotenv()  # .env 로드
@@ -50,6 +51,7 @@ def upload_results(results, config):
     
     try:
         with conn.cursor() as cursor:
+            print("DB 업로드 시작...")
             sql = """
             INSERT INTO AnalysisResults (
                 original_url,
@@ -85,8 +87,10 @@ def upload_results(results, config):
         conn.commit()
         
     except Exception as e:
+        print(f"DB 업로드 실패: {e}")
         conn.rollback()
         raise e
     
     finally:
+        print("close the DB connection")
         conn.close()
