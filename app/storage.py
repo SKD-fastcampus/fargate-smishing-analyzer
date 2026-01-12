@@ -75,7 +75,7 @@ def upload_results(results, config):
                 screenshot_path = %s,
                 details = %s,
                 Field = %s
-            ) WHERE {primary_key_col} = %s
+            WHERE {primary_key_col} = %s
             """
 
             cursor.execute(
