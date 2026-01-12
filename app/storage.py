@@ -6,6 +6,7 @@ import pymysql
 import os
 from dotenv import load_dotenv
 
+
 def upload_results(results, config):
     results.pop("status", None)
     
@@ -52,24 +53,30 @@ def upload_results(results, config):
     try:
         with conn.cursor() as cursor:
             print("DB 업로드 시작...")
-            sql = """
-            INSERT INTO AnalysisResults (
-                original_url,
-                final_url,
-                status,
-                risk_score,
-                screenshot_path,
-                details,
-                Field
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s
-            )
-            """
-
+            
+            primary_key_col = "result_id"
+            
+            primary_key_val = config.get("primary_key")
+            if not primary_key_val:
+                raise ValueError("primary_key 값이 존재하지 않습니다.")
+            
             screenshot_path = None
             if "screenshot" in results:
                 s = results["screenshot"]
                 screenshot_path = f"s3://{s['bucket']}/{s['key']}"
+            
+            sql = f"""
+            UPDATE AnalysisResults
+            SET
+                original_url = %s,
+                final_url = %s,
+                status = %s,
+                risk_score = %s,
+                screenshot_path = %s,
+                details = %s,
+                Field = %s
+            ) WHERE {primary_key_col} = %s
+            """
 
             cursor.execute(
                 sql,
@@ -80,14 +87,15 @@ def upload_results(results, config):
                     results.get("summary", {}).get("risk_score"),   # risk_score
                     screenshot_path,                        # screenshot_path
                     json.dumps(results, ensure_ascii=False),# details (전체 분석 결과)
-                    config.get("user_id")                   # Field (user id)
+                    config.get("user_id"),                  # Field (user id)
+                    primary_key_val
                 )
             )
 
         conn.commit()
         
     except Exception as e:
-        print(f"DB 업로드 실패: {e}")
+        print(f"DB 업데이트 실패: {e}")
         conn.rollback()
         raise e
     
