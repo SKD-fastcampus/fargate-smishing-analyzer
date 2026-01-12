@@ -4,3 +4,4 @@ boto3
 python-whois
 pymysql
 python-dotenv
+cryptography
