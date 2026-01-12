@@ -75,7 +75,7 @@ def upload_results(results, config):
                     results.get("target_url"),              # original_url
                     results.get("final_url"),               # final_url
                     "DONE",                                 # status
-                    results.get("risk_score"),              # risk_score
+                    results.get("summary", {}).get("risk_score"),   # risk_score
                     screenshot_path,                        # screenshot_path
                     json.dumps(results, ensure_ascii=False),# details (전체 분석 결과)
                     config.get("user_id")                   # Field (user id)
