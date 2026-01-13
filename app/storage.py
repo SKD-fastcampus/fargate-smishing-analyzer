@@ -53,7 +53,6 @@ def upload_results(results, config):
     try:
         with conn.cursor() as cursor:
             print("DB 업로드 시작...")
-            
             primary_key_col = "result_id"
             
             primary_key_val = config.get("primary_key")
@@ -66,7 +65,7 @@ def upload_results(results, config):
                 screenshot_path = f"s3://{s['bucket']}/{s['key']}"
             
             sql = f"""
-            UPDATE AnalysisResults
+            UPDATE analysis_results
             SET
                 original_url = %s,
                 final_url = %s,
@@ -74,7 +73,7 @@ def upload_results(results, config):
                 risk_score = %s,
                 screenshot_path = %s,
                 details = %s,
-                Field = %s
+                user_id = %s
             WHERE {primary_key_col} = %s
             """
 
