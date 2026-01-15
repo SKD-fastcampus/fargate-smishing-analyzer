@@ -169,7 +169,7 @@ async def collect_elements(page, context, network_data):
     try:
         print("tls 연결 시작")
         ctx = ssl.create_default_context()
-        with socket.create_connection((host, 443), timeout=5) as sock:
+        with socket.create_connection((host, 443), timeout=30) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 cert = ssock.getpeercert()
                 
