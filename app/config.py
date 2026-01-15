@@ -1,8 +1,19 @@
 import os
+from urllib.parse import urlparse
+
+def normalize_url(url: str) -> str:
+    url = url.strip()
+
+    # 스킴이 없으면 https:// 붙이기
+    parsed = urlparse(url)
+    if not parsed.scheme:
+        url = "https://" + url
+
+    return url
 
 def load_config():
     # 환경변수 읽기
-    TARGET_URL = os.getenv("TARGET_URL")
+    TARGET_URL = normalize_url(os.getenv("TARGET_URL"))
     S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
     AWS_REGION = os.getenv("AWS_REGION", "ap-northeast-2")
     
