@@ -346,22 +346,26 @@ async def analyze(config):
     
     page = await context.new_page()
     
+    network_data = attach_network_trackers(page)
+        
+    # 페이지 JS 동작 안정화 대기
+    await page.wait_for_timeout(2000)
+    
     try:
         print("새 page 생성")
         
-        network_data = attach_network_trackers(page)
-        
-        # 페이지 JS 동작 안정화 대기
-        await page.wait_for_timeout(2000)
-        
         await page.goto(config["target_url"], timeout=30000, wait_until="domcontentloaded")
-        elements = await collect_elements(page, context, network_data)
-        
     except TimeoutError:
         print("timeout")
         elements = {"status": "timeout"}
     except Error as e:
         print(f"error 발생: {e}")
+        elements = {"status": "error", "message": str(e)}
+    
+    try:
+        elements = await collect_elements(page, context, network_data)
+    except Exception as e:
+        print(f"collect_elements 실패: {e}")
         elements = {"status": "error", "message": str(e)}
     finally:
         print("browser 닫는 중...")
@@ -372,6 +376,28 @@ async def analyze(config):
         "status": "err"
     }
     if elements["status"] == "ok":
+        # =========================
+        # 🔥 NO_DOM / Download only
+        # =========================
+        if elements.get("html") is None:
+            results["status"] = "ok"
+            results["user_id"] = config["user_id"]
+            results["target_url"] = config["target_url"]
+            results["final_url"] = elements["page_url"]
+            results["screenshot"] = None
+            results["summary"] = {
+                "risk_score": 60,
+                "risk_level": "HIGH"
+            }
+            results["details"] = {
+                "redirect_chain": build_redirect_chain(elements),
+                "download_attempt": build_download_attempt(elements)
+            }
+            results["confidence"] = {
+                "analysis_coverage": "PARTIAL",
+                "limitations": ["NO_DOM"]
+            }
+            return results
         risk_score = risk_scoring(elements)
         
         results["status"] = "ok"
@@ -393,12 +419,17 @@ async def analyze(config):
         }
         
         limitations = []
-        
-        if any(elements["limitation"].values()):
+
+        limitation = elements.get("limitation", {})
+
+        if limitation.get("no_dom"):
+            limitations.append("NO_DOM")
+        elif any(limitation.values()):
             limitations.append("CAPTCHA")
 
         results["confidence"] = {
             "analysis_coverage": "PARTIAL" if limitations else "ALL",
             "limitations": limitations or None
         }
+
     return results

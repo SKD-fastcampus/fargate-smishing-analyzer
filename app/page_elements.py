@@ -69,7 +69,63 @@ def attach_network_trackers(page):
         "js_eval_hits": js_eval_hits
     }
 
-async def collect_elements(page, context, network_data):
+async def collect_elements(page, context, network_data): 
+    # DOM 존재 여부 체크(only download 케이스)
+    try:
+        has_dom = await page.evaluate("() => !!document.body")
+    except Exception:
+        has_dom = False
+
+    # --------------------
+    # DOM 없는 다운로드 케이스
+    # --------------------
+    if not has_dom:
+        return {
+            "status": "ok",
+            "page_url": page.url,
+
+            # DOM 없음
+            "html": None,
+            "screenshot": None,
+            "cookies": [],
+
+            # network 중심 분석
+            "redirect_chain": network_data["redirects"],
+            "navigation_log": network_data["navigation_log"],
+            "downloads": network_data["downloads"],
+            "post_requests": network_data["post_requests"],
+
+            # behavioral → 없음
+            "ui_deception": {
+                "fullscreen": False,
+                "hidden_overflow": False
+            },
+            "keystroke_capture": {
+                "onkeydown": 0,
+                "onkeypress": 0,
+                "onkeyup": 0
+            },
+            "eval_usage_count": 0,
+            "tab_control": {
+                "before_unload": False,
+                "onunload": False,
+                "visibility_handler": False,
+                "onblur": False,
+                "onfocus": False,
+                "onresize": False,
+                "history_length": 0
+            },
+
+            # domain / tls
+            "domain_mismatch": [],
+            "domain_age": None,
+            "tls_info": {},
+
+            "limitation": {
+                "no_dom": True
+            }
+        }
+        
     # --------------------
     # UI deception / DOM
     # --------------------

@@ -10,33 +10,36 @@ from dotenv import load_dotenv
 def upload_results(results, config):
     results.pop("status", None)
     
-    try:
-        print("S3 업로드 시작...")
-        # s3 클라이언트 생성
-        s3 = boto3.client("s3", region_name=config["aws_region"])
-        
-        timestamp = datetime.now(timezone.utc).isoformat().replace(":", "-").replace(".", "-")
-        safe_url = re.sub(r"[^a-zA-Z0-9]", "_", config["target_url"])[:50]
-        artifact_prefix = f"screenshots/{safe_url}"
+    if results.get("screenshot"):
+        try:
+            print("S3 업로드 시작...")
+            # s3 클라이언트 생성
+            s3 = boto3.client("s3", region_name=config["aws_region"])
+            
+            timestamp = datetime.now(timezone.utc).isoformat().replace(":", "-").replace(".", "-")
+            safe_url = re.sub(r"[^a-zA-Z0-9]", "_", config["target_url"])[:50]
+            artifact_prefix = f"screenshots/{safe_url}"
 
-        # 업로드
-        s3.put_object(
-            Bucket=config["s3_bucket_name"],
-            Key=f"{artifact_prefix}/{timestamp}.png",
-            Body=results["screenshot"],
-            ContentType="image/png"
-        )
+            # 업로드
+            s3.put_object(
+                Bucket=config["s3_bucket_name"],
+                Key=f"{artifact_prefix}/{timestamp}.png",
+                Body=results["screenshot"],
+                ContentType="image/png"
+            )
+            
+            results["screenshot"] = {
+                "provider": "s3",
+                "bucket": config["s3_bucket_name"],
+                "key": f"{artifact_prefix}/{timestamp}.png",
+                "region": config["aws_region"]
+            }
+            
+        except Exception as e:
+            print(f"S3에 screenshot 업로드 실패: {e}")
+    else:
+        print("screenshot 없음 → S3 업로드 스킵")
         
-        results["screenshot"] = {
-            "provider": "s3",
-            "bucket": config["s3_bucket_name"],
-            "key": f"{artifact_prefix}/{timestamp}.png",
-            "region": config["aws_region"]
-        }
-        
-    except Exception as e:
-        print(f"S3에 screenshot 업로드 실패: {e}")
-    
     # DB 업로드 수행
     load_dotenv()  # .env 로드
     
@@ -64,8 +67,8 @@ def upload_results(results, config):
                 raise ValueError("primary_key 값이 존재하지 않습니다.")
             
             screenshot_path = None
-            if "screenshot" in results:
-                s = results["screenshot"]
+            s = results.get("screenshot")
+            if isinstance(s, dict):
                 screenshot_path = f"s3://{s['bucket']}/{s['key']}"
             
             sql = f"""
