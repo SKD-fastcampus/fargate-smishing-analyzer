@@ -360,7 +360,8 @@ async def analyze(config):
         elements = {"status": "timeout"}
     except Error as e:
         print(f"error 발생: {e}")
-        elements = {"status": "error", "message": str(e)}
+        if "Download is starting" in str(e):
+            print("다운로드 전용 URL")
     
     try:
         elements = await collect_elements(page, context, network_data)

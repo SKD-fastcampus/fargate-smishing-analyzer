@@ -75,6 +75,9 @@ async def collect_elements(page, context, network_data):
         has_dom = await page.evaluate("() => !!document.body")
     except Exception:
         has_dom = False
+    
+    if network_data["downloads"]:
+        has_dom = False
 
     # --------------------
     # DOM 없는 다운로드 케이스
@@ -215,13 +218,14 @@ async def collect_elements(page, context, network_data):
     domain = parsed.hostname
     host = domain
     
+    tls_info = {}
+    
     if parsed.scheme != "https" or not host:
-        return {
+        tls_info = {
             "https": False,
             "error": "not_https"
         }
-    
-    tls_info = {}
+        
     try:
         print("tls 연결 시작")
         ctx = ssl.create_default_context()
