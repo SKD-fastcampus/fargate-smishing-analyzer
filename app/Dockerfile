@@ -1,6 +1,10 @@
 # 공식 Playwright Python 이미지 (Chromium 포함)
 FROM mcr.microsoft.com/playwright/python:v1.57.0
 
+RUN apt-get update && apt-get install -y \
+    whois \
+    && rm -rf /var/lib/apt/lists/*
+
 # 작업 디렉토리
 WORKDIR /app
 
