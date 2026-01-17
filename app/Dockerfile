@@ -10,8 +10,8 @@ COPY requirements.txt .
 # Python 라이브러리 설치
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Playwright 브라우저 설치 (이미지에 포함돼 있지만 안전하게)
-# RUN playwright install chromium
+# Playwright 브라우저 설치
+RUN playwright install chromium
 
 # 앱 코드 복사
 COPY . /app

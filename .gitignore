@@ -13,5 +13,10 @@
 node_modules/
 npm-debug.log
 
+#python
+__pycache__/
+
 # Docker
 # (Exclude if you don't want local builds in git, usually we keep Dockerfile but invoke build)
+
+.env
