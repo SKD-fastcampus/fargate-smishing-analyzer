@@ -70,9 +70,20 @@ def attach_network_trackers(page):
     }
 
 async def collect_elements(page, context, network_data): 
+    parsed = urlparse(page.url)
+    domain = parsed.hostname
+    
+    # Playwright가 에러 페이지에 있거나 도메인 해석에 실패했는지 확인
+    is_invalid_domain = False
+    if not domain or "about:blank" in page.url:
+        is_invalid_domain = True
+        
     # DOM 존재 여부 체크(only download 케이스)
     try:
-        has_dom = await page.evaluate("() => !!document.body")
+        if is_invalid_domain:
+            has_dom = False
+        else:
+            has_dom = await page.evaluate("() => !!document.body && document.body.innerText.length > 0")
     except Exception:
         has_dom = False
     
@@ -80,9 +91,9 @@ async def collect_elements(page, context, network_data):
         has_dom = False
 
     # --------------------
-    # DOM 없는 다운로드 케이스
+    # DOM 없는 다운로드 케이스 or 존재하지 않는 domain
     # --------------------
-    if not has_dom:
+    if not has_dom or is_invalid_domain:
         return {
             "status": "ok",
             "page_url": page.url,
