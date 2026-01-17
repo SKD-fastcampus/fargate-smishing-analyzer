@@ -2,6 +2,7 @@ import ssl
 import socket
 import time
 import whois
+import asyncio
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 
@@ -286,20 +287,27 @@ async def collect_elements(page, context, network_data):
     domain_age = None
     try:
         print("domain 정보 불러오기...")
-        w = whois.whois(domain)
+        
+        try:
+            w = await asyncio.wait_for(
+                asyncio.to_thread(whois.whois, domain), 
+                timeout=10.0
+            )
 
-        created = w.creation_date
-        if isinstance(created, list):
-            created = created[0]
+            created = w.creation_date
+            if isinstance(created, list):
+                created = created[0]
 
-        if not created:
-            domain_age = None
-
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
-
-        now = datetime.now(timezone.utc)
-        domain_age = (now - created).days
+            if created:
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                    now = datetime.now(timezone.utc)
+                    domain_age = (now - created).days
+            else:
+                domain_age = -1
+        except asyncio.TimeoutError:
+            print(f"WHOIS 조회 타임아웃: {domain}")
+            domain_age = -1  # 타임아웃 발생 시 -1 처리
 
     except Exception:
         print("domain 정보 불러오기 실패")
