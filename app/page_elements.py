@@ -31,9 +31,9 @@ def attach_network_trackers(page):
     
     async def on_response(response):
         try:
-            print("js 파일 불러오기(eval count)")
             ct = response.headers.get("content-type", "")
             if "javascript" in ct:
+                print("js 파일 불러오기(eval count)")
                 body = await response.text()
                 hits = body.count("eval(")
                 if hits > 0:
