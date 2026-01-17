@@ -301,8 +301,8 @@ async def collect_elements(page, context, network_data):
             if created:
                 if created.tzinfo is None:
                     created = created.replace(tzinfo=timezone.utc)
-                    now = datetime.now(timezone.utc)
-                    domain_age = (now - created).days
+                now = datetime.now(timezone.utc)
+                domain_age = (now - created).days
             else:
                 domain_age = -1
         except asyncio.TimeoutError:
